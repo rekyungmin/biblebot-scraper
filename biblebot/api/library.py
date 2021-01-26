@@ -8,7 +8,6 @@ BookDetail과 BookPhoto를 통해
 ['ISBN', '서지정보', '대출일자', '반납예정일', '대출상태', '연기신청', '도서이미지']의 데이터가 완성된다.
 """
 from typing import Dict, Optional, List, Tuple
-from dataclasses import dataclass
 from base64 import b64encode
 import re
 
@@ -23,7 +22,11 @@ from .base import (
 )
 from ..reqeust.base import Response
 from ..api.intranet import IParserPrecondition
-from .common import httpdate_to_unixtime, parse_table
+from .common import (
+    httpdate_to_unixtime,
+    parse_table,
+    extract_alerts
+)
 
 __all__ = (
     "Login",
@@ -72,23 +75,34 @@ class Login(ILoginFetcher, IParser):
 
     @classmethod
     def parse(cls, response: Response) -> APIResponseType:
+        """
+        로그인 성공: status 302, location header 포함, 리다이렉트 메세지를 body에 포함
+        로그인 실패: status 200, location header 미포함, alert 메세지를 body에 포함
+            [상황 1] 잘못된 입력값
+            [상황 2] 서비스 이용 불가한 졸업예정자
+            [상황 3] 인코딩, 잘못된 경로 입력
+        """
         soup = response.soup
-        # 로그인 실패: 잘못된 입력값
+        # 로그인 성공
+        if response.status == 302:
+            iat = httpdate_to_unixtime(response.headers["date"])
+            return ResourceData(
+                data={"cookies": response.cookies, "iat": iat}, link=response.url
+            )
+        # 로그인 실패: [상황 2] 일시 [상항 1] alert 보다 먼저 알림
         if "location" not in response.headers:
-            alert = soup.select_one(".alert-warning").text.strip()
-            return ErrorData(error={"title": alert}, link=response.url)
-        # 로그인 실패: 인코딩, 경로이탈
+            alerts: List[str] = extract_alerts(response.soup)
+            alerts.append(soup.select_one(".alert-warning").text.strip())
+            alert = alerts[0] if alerts else ""
+            return ErrorData(
+                error={"title": alert, "alert_messages": alerts}, link=response.url
+            )
+        # 로그인 실패: [상황 3]
         m = re.search(r"ErrorCode=(\d+)", response.headers["location"])
         if m:
             error_code = m.group(1)
             return ErrorData(
                 error={"title": "잘못된 경로입니다.", "code": error_code}, link=response.url
-            )
-        # 로그인 성공
-        else:
-            iat = httpdate_to_unixtime(response.headers["date"])
-            return ResourceData(
-                data={"cookies": response.cookies, "iat": iat}, link=response.url
             )
 
 
