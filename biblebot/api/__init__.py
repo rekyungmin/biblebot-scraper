@@ -24,6 +24,8 @@ from .library import Login as LibraryLogin
 from .library import CheckoutList as LibraryCheckoutList
 from .library import BookDetail as LibraryBookDetail
 from .library import BookPhoto as LibraryBookPhoto
+from .library import NewBookPath as LibraryNewBookPath
+from .library import BookIntro as LibraryBookIntro
 
 
 __all__ = (
@@ -76,3 +78,5 @@ class LibraryAPI:
     CheckoutList = LibraryCheckoutList
     BookDetail = LibraryBookDetail
     BookPhoto = LibraryBookPhoto
+    NewBookPath = LibraryNewBookPath
+    BookIntro = LibraryBookIntro
